@@ -44,7 +44,8 @@ class ErrorAnalyzer:
       "command": "string",
       "explanation": "string",
       "risk_level": "low|medium|high",
-      "expected_output": "string"
+      "expected_output": "string",
+      "confidence": "like 50%, 70%",
     }
   ],
   "verification": "string"
@@ -84,8 +85,6 @@ class ErrorAnalyzer:
             raise RuntimeError(
                 f"Invalid LLM output:\n {raw}"
             ) from e
-
-
 
 
 # Test
