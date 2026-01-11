@@ -22,42 +22,51 @@ class ErrorAnalyzer:
         :param error_data: Error logs from client
         :returns
         """
-        machine_context = error_data["machine_context"]
-        error_log = error_data["error_log"]
+        machine = error_data.machine
+        error = error_data.error
 
         system_prompt = """
         You are a senior Linux system administrator.
         You analyze system errors and suggest SAFE, IDEMPOTENT fixes only.
         Never suggest destructive commands.
         Prefer systemctl, service management, log inspection, and configuration validation.
-        Always respond in valid JSON only.
+        You MUST output valid JSON that EXACTLY matches this schema.
+        Do NOT rename fields.
+        Do NOT omit fields.
+        Do NOT add extra fields.
+        Do NOT use markdown.
+
+        Schema:
+{
+  "diagnosis": "string",
+  "commands": [
+    {
+      "command": "string",
+      "explanation": "string",
+      "risk_level": "low|medium|high",
+      "expected_output": "string"
+    }
+  ],
+  "verification": "string"
+}
+        """
+        prompt = f"""
+        Machine Context:
+        - OS: {machine.os}
+        - Hostname: {machine.hostname}
+        - Kernel: {machine.kernel_version}
+        - Services: {', '.join(machine.services)}
+
+        Error:
+        - Source: {error.source}
+        - Service: {error.service}
+        - Message: {error.message}
+
+        Raw Log:
+        {error.raw_log}
         """
 
-        prompt = f"""
-            Machine Context:
-            - OS: {machine_context['os']}
-            - Hostname: {machine_context['hostname']}
-            - Services: {', '.join(machine_context['services'])}
-            
-            Error Log:
-            {error_log}
-            
-            Provide a JSON response with this structure:
-            {{
-                "diagnosis": "Brief explanation of the issue",
-                "commands": [
-                    {{
-                        "command": "the actual command to run",
-                        "explanation": "why this command is needed",
-                        "risk_level": "low|medium|high",
-                        "expected_output": "what output indicates success"
-                    }}
-                ],
-                "verification": "how to verify the fix worked"
-            }}
-            
-            Only suggest safe and idempotent commands. Prefer systemctl, service management, log rotation, etc.
-"""
+
         response = self.client.models.generate_content(
             model=self.model_id,
             contents=prompt,
@@ -82,24 +91,33 @@ class ErrorAnalyzer:
 # Test
 
 TEST_ERROR_DATA = {
-    "machine_context": {
-        "os": "Ubuntu 22.04 LTS",
+    "error_id": "err-20260108-001",
+    "severity": "high",
+    "machine": {
+        "machine_id": "web-01",
         "hostname": "web-01",
-        "services": ["nginx", "postgresql", "redis"]
+        "os": "Ubuntu 22.04 LTS",
+        "services": ["nginx", "postgresql", "redis"],
     },
-    "error_log": """
+    "error": {
+        "source": "systemd",
+        "service": "nginx",
+        "message": "Failed to start nginx: address already in use",
+        "raw_log": """
 Jan 08 18:10:21 web-01 systemd[1]: nginx.service: Failed with result 'exit-code'.
-Jan 08 18:10:21 web-01 systemd[1]: Failed to start A high performance web server and a reverse proxy server.
 Jan 08 18:10:21 web-01 nginx[1234]: nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
 """
+    }
 }
+
 
 
 if __name__ == "__main__":
     import json
     analyzer = ErrorAnalyzer()
     print("Sending data:\n")
-    result = analyzer.analyze_and_fix(TEST_ERROR_DATA)
+    error_data = ErrorData.model_validate(TEST_ERROR_DATA)
+    result = analyzer.analyze_and_fix(error_data)
     # print("Raw output:\n")
     # print(result)
     print("\nParsed JSON:\n")
