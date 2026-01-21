@@ -33,7 +33,7 @@ class Errors(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class Analysis(Base):
-    __tablename__ = "analysis"
+    __tablename__ = "analyses"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     error_id = Column(UUID(as_uuid=True), ForeignKey("errors.id", ondelete="CASCADE"), nullable=False)
     diagnosis = Column(String, nullable=False)
@@ -43,7 +43,7 @@ class Analysis(Base):
 class Analysis_Commands(Base):
     __tablename__ = "analysis_commands"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    analysis_id = Column(UUID(as_uuid=True), ForeignKey("analysis.id", ondelete="CASCADE"), nullable=False)
+    analysis_id = Column(UUID(as_uuid=True), ForeignKey("analyses.id", ondelete="CASCADE"), nullable=False)
     command = Column(String, nullable=False)
     explanation = Column(String, nullable=False)
     risk_level = Column(String, nullable=False)
