@@ -1,0 +1,13 @@
+{
+    "machine_id": "test-machine-01",
+    "services": [
+        "nginx",
+        "postgresql",
+        "docker"
+    ],
+    "log_files": [
+        "/tmp/test_error.log"
+    ],
+    "execution_mode": "safe",
+    "sudo_password": "nocotpou1"
+}

@@ -1,38 +1,83 @@
-from typing import List
-
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from typing_extensions import Literal
-from datetime import datetime
+from datetime import datetime, timezone
+from enum import Enum
 
-from backend.app.schemas.error import MachineContext
+# --- Shared Enums & Sub-models ---
 
+class SeverityLevel(str, Enum):
+    low = "low"
+    medium = "medium"
+    high = "high"
+    critical = "critical"
+    unknown = "unknown"
 
-class MachineRegistrationRequest(BaseModel):
-    hostname: str
-    machine_name: str
-    hwid: str
-
-    os: str
-    arch: Literal["x86_64", "arm64", "aarch64"]
-
-    services: List[str] = Field(..., examples=["nginx", "postgresql"])
-    ip_addr: str
-
-class ErrorCreate(BaseModel):
+class MachineContext(BaseModel):
     machine_id: str
-    error_log: str
-    detected_at: datetime
-    severity: Literal["unknown", "critical", "error"]
-    machine_context: MachineContext
-# class MachineContext(BaseModel):
-#     hostname: str
-#     os: str
-#     services: List[str]
-#
-#
-# class ErrorData(BaseModel):
-#     machine_id: str
-#     error_log: str
-#     detected_at: datetime
-#     severity: str = "unknown"
-#     machine_context: MachineContext
+    hostname: str
+    os: str
+    services: List[str] = Field(default_factory=list)
+    kernel_version: Optional[str] = None
+
+class ErrorLog(BaseModel):
+    source: str
+    service: Optional[str] = None
+    message: str
+    raw_log: Optional[str] = None
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+# --- Data Transfer Objects ---
+
+class ErrorData(BaseModel):
+    """
+    Data payload sent from Client to Backend.
+    """
+    error_id: str
+    severity: SeverityLevel = SeverityLevel.unknown
+    detected_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    machine: MachineContext
+    error: ErrorLog
+
+class FixCommand(BaseModel):
+    command: str
+    explanation: str
+    risk_level: Literal["low", "medium", "high"]
+    expected_output: str
+    requires_sudo: bool = False
+    confidence: Optional[str] = None
+
+class AnalysisResult(BaseModel):
+    """
+    Response received from Backend (after polling/approval).
+    """
+    diagnosis: str
+    commands: List[FixCommand]
+    verification: str
+
+class JobType(str, Enum):
+    GET_STATUS = "GET_STATUS"
+    GET_LOGS = "GET_LOGS"
+    EXEC_CMD = "EXEC_CMD"
+
+class Job(BaseModel):
+    job_id: str
+    type: JobType
+    args: Dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class HeartbeatRequest(BaseModel):
+    machine_id: str
+    hostname: str
+    services: List[str]
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class HeartbeatResponse(BaseModel):
+    pending_jobs: List[Job]
+
+class JobResult(BaseModel):
+    job_id: str
+    machine_id: str
+    output: str
+    success: bool
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

@@ -1,20 +1,22 @@
 import os
+import json
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
+from openai import OpenAI
 from pydantic import ValidationError
 from backend.app.schemas.analysis import AnalysisResult
 from backend.app.schemas.error import ErrorData
 
 class ErrorAnalyzer:
     def __init__(self):
-        load_dotenv()
-        api_key = os.getenv("GENAI_API_KEY")
+        load_dotenv("backend/.env")
+        api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
-            raise RuntimeError("GENAI_API_KEY not set")
-        self.client = genai.Client(api_key=api_key)
-        self.model_id = "gemini-2.5-flash"
-        # print(self.client.schemas.list()[:])
+            # Fallback or just raise?
+            # For user experience, let's look for both or strictly switch.
+            # User asked to switch, so strict switch.
+            raise RuntimeError("OPENAI_API_KEY not set")
+        self.client = OpenAI(api_key=api_key)
+        self.model_id = "gpt-4o"
 
     def analyze_and_fix(self, error_data: ErrorData) -> AnalysisResult:
         """
@@ -46,6 +48,7 @@ class ErrorAnalyzer:
       "risk_level": "low|medium|high",
       "expected_output": "string",
       "confidence": "like 50%, 70%",
+      "requires_sudo": "boolean"
     }
   ],
   "verification": "string"
@@ -67,25 +70,24 @@ class ErrorAnalyzer:
         {error.raw_log}
         """
 
-
-        response = self.client.models.generate_content(
-            model=self.model_id,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                response_mime_type="application/json",
-
-            ),
-        )
-        raw = response.text
         try:
+            response = self.client.chat.completions.create(
+                model=self.model_id,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"}
+            )
+            raw = response.choices[0].message.content
+            
             data = json.loads(raw)
             return AnalysisResult.model_validate(data)
-        except (json.JSONDecodeError, ValidationError) as e:
+        except Exception as e:
+            # Catch OpenAI errors or JSON errors
             raise RuntimeError(
-                f"Invalid LLM output:\n {raw}"
+                f"LLM Analysis failed: {e}"
             ) from e
-
 
 # Test
 
@@ -108,8 +110,6 @@ Jan 08 18:10:21 web-01 nginx[1234]: nginx: [emerg] bind() to 0.0.0.0:80 failed (
 """
     }
 }
-
-
 
 if __name__ == "__main__":
     import json
