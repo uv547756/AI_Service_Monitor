@@ -1,0 +1,67 @@
+version: "3.8"
+
+services:
+  # ── Backend (FastAPI) ──────────────────────────────────
+  backend:
+    build: ./backend
+    container_name: logwatch-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - db-data:/app/data
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./data/logwatch.db
+      - API_KEY=${API_KEY:-changeme-dev-key}
+      - AI_PROVIDER=${AI_PROVIDER:-openai}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.1:8b}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - TELEGRAM_MODE=${TELEGRAM_MODE:-polling}
+      - TELEGRAM_WEBHOOK_URL=${TELEGRAM_WEBHOOK_URL:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - logwatch-net
+
+  # ── Frontend (React) ──────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: /api
+    container_name: logwatch-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - logwatch-net
+
+  # ── Client Agent (runs on monitored machine) ──────────
+  # Uncomment to run agent in Docker (usually runs natively)
+  # client-agent:
+  #   build: ./client-agent
+  #   container_name: logwatch-agent
+  #   environment:
+  #     - SERVER_URL=http://backend:8000
+  #     - API_KEY=${API_KEY:-changeme-dev-key}
+  #   depends_on:
+  #     - backend
+  #   restart: unless-stopped
+  #   networks:
+  #     - logwatch-net
+
+volumes:
+  db-data:
+
+networks:
+  logwatch-net:
+    driver: bridge
