@@ -5,11 +5,11 @@ Client agent configuration.
 
 class AgentConfig:
     # Server connection
-    SERVER_URL: str = "http://localhost:8000"
+    SERVER_URL: str = "http://192.168.1.180:8000"
     API_KEY: str = "changeme-dev-key"
 
     # Monitoring
-    POLL_INTERVAL: int = 30  # seconds between polling for commands
+    POLL_INTERVAL: int = 5  # seconds between polling for commands
     LOG_CHECK_INTERVAL: int = 5  # seconds between log checks
 
     # journalctl filters

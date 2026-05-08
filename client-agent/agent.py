@@ -82,8 +82,11 @@ class Agent:
             log_context=context,
         )
 
-        if result and not self.machine_id:
-            # The server should return info we can use to poll
+        if result:
+            # Store machine_id so we can poll for approved commands
+            if result.get("machine_id") and not self.machine_id:
+                self.machine_id = result["machine_id"]
+                logger.info("Machine registered with id: %s", self.machine_id)
             logger.info("First report sent successfully")
 
     def _poll_commands(self):
@@ -92,15 +95,20 @@ class Agent:
             try:
                 if self.machine_id:
                     commands = self.api.get_pending_commands(self.machine_id)
+                    if commands:
+                        logger.info("Found %d pending command(s)", len(commands))
                     for cmd in commands:
                         logger.info("Executing approved command: %s", cmd["command_text"])
                         exit_code, stdout, stderr = execute_command(cmd["command_text"])
+                        logger.info("Command finished — exit_code=%d", exit_code)
                         self.api.send_result(
                             command_id=cmd["id"],
                             exit_code=exit_code,
                             stdout=stdout,
                             stderr=stderr,
                         )
+                else:
+                    logger.debug("No machine_id yet — waiting for first report")
             except Exception as e:
                 logger.error("Polling error: %s", e)
 
