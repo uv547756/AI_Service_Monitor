@@ -131,6 +131,7 @@ async def agent_report(payload: AgentReportPayload, db: AsyncSession = Depends(g
 
     return {
         "status": "received",
+        "machine_id": machine.id,
         "issue_id": issue.id,
         "command_id": command.id if command else None,
         "severity": ai_result.severity,
